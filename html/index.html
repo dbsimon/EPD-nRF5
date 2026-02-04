@@ -4,20 +4,20 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>墨水屏日历</title>
+	<title>E-INK DISPLAY</title>
 	<link rel="shortcut icon" type="image/png" href="favicon.png">
 	<link rel="stylesheet" href="css/main.css?v=20251109">
 </head>
 
 <body>
 	<div class="main">
-		<h3>墨水屏日历</h3>
+		<h3>E-INK DISPLAY</h3>
 		<fieldset>
-			<legend>蓝牙连接</legend>
+			<legend>BT Connection</legend>
 			<div class="flex-container">
 				<div class="flex-group">
-					<button id="connectbutton" type="button" class="primary" onclick="preConnect()">连接</button>
-					<button id="reconnectbutton" type="button" class="secondary" onclick="reConnect()">重连</button>
+					<button id="connectbutton" type="button" class="primary" onclick="preConnect()">CONNECT</button>
+					<button id="reconnectbutton" type="button" class="secondary" onclick="reConnect()">RE-CONNECT</button>
 					<button type="button" class="secondary" onclick="clearLog()">清空日志</button>
 				</div>
 				<div class="flex-group right debug">
@@ -61,7 +61,7 @@
 			</div>
 		</fieldset>
 		<fieldset>
-			<legend>蓝牙传图</legend>
+			<legend>Picture Transfer</legend>
 			<div class="flex-container">
 				<input type="file" id="imageFile" accept=".png,.jpg,.bmp,.webp,.jpeg" onchange="updateImage()">
 			</div>
@@ -135,10 +135,10 @@
 			<div class="status-bar"><b>状态：</b><span id="status"></span></div>
 			<div class="flex-container">
 				<div class="flex-group">
-					<button type="button" class="secondary debug" onclick="rotateCanvas()">旋转画布</button>
-					<button type="button" class="secondary" onclick="clearCanvas()">清除画布</button>
-					<button type="button" class="secondary debug" onclick="downloadDataArray()">下载数组</button>
-					<button id="sendimgbutton" type="button" class="primary" onclick="sendimg()">发送图片</button>
+					<button type="button" class="secondary debug" onclick="rotateCanvas()">Rotate</button>
+					<button type="button" class="secondary" onclick="clearCanvas()">Clear</button>
+					<button type="button" class="secondary debug" onclick="downloadDataArray()">Download Data Array</button>
+					<button id="sendimgbutton" type="button" class="primary" onclick="sendimg()">Send Picture</button>
 				</div>
 			</div>
 			<div class="canvas-container">
@@ -148,9 +148,9 @@
 					<div class="flex-group tool-buttons">
 						<button id="brush-mode" title="画笔" class="tool-button">✏️</button>
 						<button id="eraser-mode" title="橡皮擦" class="tool-button">🧽</button>
-						<button id="text-mode" title="添加文字" class="tool-button">T</button>
-						<button id="undo-btn" title="撤销 (Ctrl+Z)" class="tool-button hide">↶</button>
-						<button id="redo-btn" title="重做 (Ctrl+Y)" class="tool-button hide">↷</button>
+						<button id="text-mode" title="Add Text" class="tool-button">T</button>
+						<button id="undo-btn" title="Undo (Ctrl+Z)" class="tool-button hide">↶</button>
+						<button id="redo-btn" title="Redo (Ctrl+Y)" class="tool-button hide">↷</button>
 					</div>
 				</div>
 				<div class="flex-container canvas-tools">
@@ -203,7 +203,7 @@
 							</optgroup>
 						</select>
 						<label for="font-size">大小:</label>
-						<input type="number" id="font-size" value="16" min="1" max="100">
+						<input type="number" id="font-size" value="50" min="1" max="100">
 					</div>
 					<div class="flex-group text-tools">
 						<input type="text" id="text-input" placeholder="输入文字" style="width:150px">
