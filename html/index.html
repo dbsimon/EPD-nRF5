@@ -237,6 +237,73 @@
 	<script type="text/javascript" src="js/paint.js?v=20251109"></script>
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
 	<script type="text/javascript" src="js/main.js?v=20251109"></script>
+<!-- 新的天氣功能代碼 -->
+	<script>
+    // 香港天文台 API URL (繁體中文)
+    const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
+
+    async function setWeatherMode() {
+        // 1. 顯示載入中
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'black';
+        ctx.font = '30px sans-serif'; 
+        ctx.fillText("讀取天文台數據...", 10, 50);
+        
+        // 呼叫原有的 render 函數來更新預覽
+        if (typeof render === 'function') render(); 
+
+        try {
+            // 2. 抓取 API 數據
+            const response = await fetch(HKO_API_URL);
+            const data = await response.json();
+            
+            // 3. 解析數據 (今天和明天)
+            const today = data.weatherForecast[0];
+            const tomorrow = data.weatherForecast[1];
+
+            const todayTemp = `${today.forecastMintemp.value}°C - ${today.forecastMaxtemp.value}°C`;
+            const tomorrowTemp = `${tomorrow.forecastMintemp.value}°C - ${tomorrow.forecastMaxtemp.value}°C`;
+            const updateTime = new Date().toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+
+            // 4. 清空畫布並繪製
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'black';
+            
+            // 這裡的排版座標 (x, y)
+            ctx.font = 'bold 36px sans-serif';
+            ctx.fillText("香港天氣預報", 20, 50);
+            
+            ctx.font = '24px sans-serif';
+            ctx.fillText(`今天 (${today.week.replace('星期', '')}):`, 20, 100);
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText(todayTemp, 20, 155);
+            
+            ctx.font = '24px sans-serif';
+            ctx.fillText(`明天 (${tomorrow.week.replace('星期', '')}):`, 20, 210);
+            ctx.font = 'bold 40px Arial';
+            ctx.fillText(tomorrowTemp, 20, 255);
+            
+            ctx.font = '16px sans-serif';
+            ctx.fillText(`更新於: ${updateTime}`, 20, 290);
+
+            // 5. 渲染預覽
+            if (typeof render === 'function') render(); 
+            
+            // 自動傳輸到設備 (如果想要自動更新，取消下面這行的註解)
+            // if (typeof process === 'function') process();
+
+        } catch (error) {
+            console.error(error);
+            ctx.fillStyle = 'black';
+            ctx.font = '24px sans-serif';
+            ctx.fillText("天氣數據獲取失敗", 10, 50);
+            if (typeof render === 'function') render();
+        }
+    }
+    </script>
+	
 </body>
 
 </html>
