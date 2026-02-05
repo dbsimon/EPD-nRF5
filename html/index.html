@@ -238,22 +238,21 @@
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
 	<script type="text/javascript" src="js/main.js?v=20251109"></script>
 	
-<!-- 香港天氣功能 (三天 + 天氣狀況版) -->
+<!-- 香港天氣功能 (絕對日期校正版) -->
 <script>
 const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
 
-// 天文台 Icon 代碼轉文字/Emoji 對照表
 function getWeatherStatus(code) {
     const c = parseInt(code);
     if (c === 50) return { t: "天晴", e: "☀️" };
-    if (c >= 51 && c <= 53) return { t: "晴/間中有光", e: "🌤️" }; // 簡化顯示
+    if (c >= 51 && c <= 53) return { t: "晴/間中光", e: "🌤️" };
     if (c === 54) return { t: "驟雨", e: "🌦️" };
     if (c >= 60 && c <= 61) return { t: "多雲", e: "☁️" };
     if (c >= 62 && c <= 65) return { t: "雨/雷暴", e: "🌧️" };
     if (c >= 70 && c <= 77) return { t: "天色良好", e: "☀️" };
     if (c >= 80 && c <= 85) return { t: "大風/霧", e: "🌫️" };
-    if (c >= 90 && c <= 93) return { t: "雨/熱帶氣旋", e: "⛈️" };
-    return { t: "", e: "" }; // 未知
+    if (c >= 90 && c <= 93) return { t: "雨/熱帶", e: "⛈️" };
+    return { t: "", e: "" };
 }
 
 async function setWeatherMode() {
@@ -261,31 +260,40 @@ async function setWeatherMode() {
     if (!canvasEl) { alert('找不到畫布元素'); return; }
     const ctx = canvasEl.getContext('2d');
     
-    // 載入畫面
+    // 1. 顯示讀取中
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.fillStyle = 'black';
-    const fontSize = Math.floor(canvasEl.width / 15);
-    ctx.font = `${fontSize}px sans-serif`;
-    ctx.fillText("讀取天文台數據...", 10, 50);
-    
+    ctx.font = '30px sans-serif';
+    ctx.fillText("校正日期並讀取中...", 10, 50);
     if (typeof render === 'function') render();
-    else if (typeof update === 'function') update();
 
     try {
         const response = await fetch(HKO_API_URL);
         const data = await response.json();
         
-        // 準備時間與日期
-        const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+        // --- 核心修正邏輯 ---
         const now = new Date();
-        const todayDateStr = now.toISOString().slice(0,10).replace(/-/g, ""); // YYYYMMDD
+        // 格式化今天的日期為 YYYYMMDD (例如 20260205)
+        const todayStr = now.getFullYear() + 
+                        (now.getMonth()+1).toString().padStart(2, '0') + 
+                        now.getDate().toString().padStart(2, '0');
         
-        // 更新時間 (含日期)
+        // 在 API 返回的列表中尋找"今天"
+        // findIndex 會回傳 -1 如果找不到
+        let startIndex = data.weatherForecast.findIndex(item => item.forecastDate === todayStr);
+        
+        // 如果找不到今天 (例如晚上 API 移除了今天)，就從第 0 筆開始 (即明天)
+        // 並設定一個變數來調整顯示文字 (可選)
+        if (startIndex === -1) {
+            startIndex = 0;
+            // 這種情況下，API 的第 0 筆就是明天 (例如 2/6)
+        }
+
+        const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
         const updateTime = now.toLocaleString('zh-HK', {
             month: '2-digit', day: '2-digit', 
-            hour: '2-digit', minute: '2-digit',
-            hour12: false
+            hour: '2-digit', minute: '2-digit', hour12: false
         });
 
         // 清空畫布
@@ -293,67 +301,50 @@ async function setWeatherMode() {
         ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.fillStyle = 'black';
         
-        // --- 1. 繪製標題 ---
+        // 標題
         ctx.font = `bold ${Math.floor(canvasEl.width / 14)}px sans-serif`;
-        ctx.fillText("香港未來三天天氣", 10, 40);
-        
-        // 畫一條橫線分隔標題
+        ctx.fillText("香港天氣預報 (未來3天)", 10, 40);
         ctx.fillRect(10, 50, canvasEl.width - 20, 2);
 
-        // --- 2. 迴圈繪製 3 天天氣 ---
-        // 根據 API 日期對齊，確保第一筆是對的
-        let startIndex = 0;
-        if (data.weatherForecast[0].forecastDate !== todayDateStr) {
-             // 如果 API 第一筆不是今天，依然顯示它，但我們知道那是"未來"的開始
-             // 這裡為了簡單，直接取前 3 筆，因為 FND API 總是給未來 9 天
-        }
+        const startY = 90;
+        const rowHeight = 65;
 
-        const startY = 90; // 第一行起始高度
-        const rowHeight = 65; // 每行高度間距
-
+        // 迴圈 3 次，從正確的 startIndex 開始抓資料
         for (let i = 0; i < 3; i++) {
-            const dayData = data.weatherForecast[i]; // 0=今, 1=明, 2=後
+            // 抓取資料：從 startIndex + i 開始
+            const dayData = data.weatherForecast[startIndex + i];
+            
+            // 防止陣列越界 (雖然不太可能)
             if (!dayData) break;
 
-            // 計算日期與星期
+            // 解析日期
             const y = dayData.forecastDate.substring(0,4);
             const m = dayData.forecastDate.substring(4,6);
             const d = dayData.forecastDate.substring(6,8);
             const dateObj = new Date(`${y}-${m}-${d}`);
-            const dateStr = `${m}/${d} (${weekDays[dateObj.getDay()]})`;
+            const dateText = `${parseInt(m)}/${parseInt(d)} (${weekDays[dateObj.getDay()]})`;
 
-            // 取得溫度
             const tempStr = `${dayData.forecastMintemp.value}-${dayData.forecastMaxtemp.value}°C`;
-
-            // 取得天氣狀況 (Icon -> 文字 + Emoji)
             const status = getWeatherStatus(dayData.ForecastIcon);
-            
-            // 設定繪圖位置 (Y軸)
             const currentY = startY + (i * rowHeight);
 
-            // 繪製: 日期
+            // 繪製日期
             ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px sans-serif`;
-            ctx.fillText(dateStr, 10, currentY);
+            ctx.fillText(dateText, 10, currentY);
 
-            // 繪製: 天氣 Emoji + 文字 (靠右一點)
-            // 如果是墨水屏，Emoji 會變成黑白，建議搭配文字
+            // 繪製天氣 (靠右一點)
             ctx.font = `${Math.floor(canvasEl.width / 20)}px sans-serif`;
-            const weatherText = `${status.e} ${status.t}`; 
-            ctx.fillText(weatherText, 160, currentY); 
+            ctx.fillText(`${status.e} ${status.t}`, 160, currentY); 
 
-            // 繪製: 溫度 (換行或靠右，視寬度而定，這裡放同一行最右邊或下一小行)
-            // 為了排版整齊，我們把溫度放在下一行稍微縮進，或者同一行最右邊
-            // 這裡採用: 同一行靠右對齊
+            // 繪製溫度 (靠最右)
             ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
             const tempWidth = ctx.measureText(tempStr).width;
             ctx.fillText(tempStr, canvasEl.width - tempWidth - 10, currentY);
         }
 
-        // --- 3. 底部更新時間 ---
         ctx.font = `${Math.floor(canvasEl.width / 28)}px sans-serif`;
         ctx.fillText(`更新: ${updateTime}`, 10, canvasEl.height - 10);
 
-        // 渲染
         if (typeof render === 'function') render();
         else if (typeof update === 'function') update();
 
@@ -363,6 +354,7 @@ async function setWeatherMode() {
     }
 }
 </script>
+
 
 	
 </body>
