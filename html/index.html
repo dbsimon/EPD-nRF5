@@ -238,63 +238,67 @@
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
 	<script type="text/javascript" src="js/main.js?v=20251109"></script>
 	
-<!-- Hong Kong Weather Mode (Icon-based) -->
+<!-- 香港天氣功能 (Emoji + PSR數值版) -->
 <script>
 const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
 
-// --- HKO Icon Code to Emoji Mapping ---
-// Source: https://www.hko.gov.hk/textonly/v2/explain/wxicon_e.htm
+// 1. Emoji 對照表
 function getWeatherEmoji(code) {
     const c = parseInt(code);
+    if (c === 50) return "☀️"; 
+    if (c >= 51 && c <= 53) return "🌤️";
+    if (c === 54) return "🌦️";
+    if (c >= 60 && c <= 61) return "☁️";
+    if (c >= 62 && c <= 65) return "🌧️";
+    if (c >= 70 && c <= 77) "🌝";
+    if (c >= 80 && c <= 85) return "🌫️";
+    if (c >= 90 && c <= 93) return "⛈️";
+    return "❓";
+}
+
+// 2. PSR (降雨概率) 簡寫轉換
+function getShortPSR(psrText) {
+    if (!psrText) return "-";
+    // API 回傳的是英文 (Low, Medium Low...) 或中文 (低, 中低...)
+    // 這裡做簡單的關鍵字對應
+    const t = psrText.toLowerCase();
     
-    // Sunny / Clear
-    if (c === 50) return "☀️"; // Sunny
-    if (c === 51) return "🌤️"; // Sunny periods
-    if (c === 52) return "🌤️"; // Sunny intervals
-    if (c === 53) return "🌤️"; // Sunny intervals with shower
-
-    // Cloudy / Overcast
-    if (c >= 60 && c <= 61) return "☁️"; // Cloudy
-    if (c === 62) return "🌥️"; // Light rain with clouds
-    if (c === 63) return "🌧️"; // Rain
-    if (c === 64) return "🌧️"; // Heavy rain
-    if (c === 65) return "⛈️"; // Thunderstorm
-
-    // Windy / Misty
-    if (c >= 80 && c <= 82) return "🌬️"; // Windy
-    if (c >= 83 && c <= 85) return "🌫️"; // Fog/Mist
-
-    // Extreme
-    if (c >= 90 && c <= 93) return "⛈️"; // Thunderstorm/Typhoon
-
-    return "❓"; // Unknown code
+    if (t.includes("high") || t.includes("高")) return "H";
+    if (t.includes("medium") || t.includes("中")) {
+        if (t.includes("low") || t.includes("低")) return "ML"; // 中低
+        if (t.includes("high") || t.includes("高")) return "MH"; // 中高
+        return "M"; // 中
+    }
+    if (t.includes("low") || t.includes("低")) return "L";
+    
+    return t; // 如果無法識別，直接顯示原字
 }
 
 async function setWeatherMode() {
     const canvasEl = document.querySelector('canvas');
-    if (!canvasEl) { alert('Canvas element not found'); return; }
+    if (!canvasEl) { alert('找不到畫布元素'); return; }
     const ctx = canvasEl.getContext('2d');
     
-    // Show Loading
+    // 顯示讀取中
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.fillStyle = 'black';
-    ctx.font = '30px sans-serif';
-    ctx.fillText("Loading Weather...", 10, 50);
+    ctx.font = '30px Arial';
+    ctx.fillText("讀取中 (Emoji+PSR)...", 10, 50);
     if (typeof render === 'function') render();
 
     try {
         const response = await fetch(HKO_API_URL);
         const data = await response.json();
         
-        // --- Date Correction Logic ---
+        // 日期校正
         const now = new Date();
         const todayStr = now.getFullYear() + 
                         (now.getMonth()+1).toString().padStart(2, '0') + 
                         now.getDate().toString().padStart(2, '0');
         
         let startIndex = data.weatherForecast.findIndex(item => item.forecastDate === todayStr);
-        if (startIndex === -1) startIndex = 0; // Default to tomorrow if today is gone
+        if (startIndex === -1) startIndex = 0; 
 
         const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
         const updateTime = now.toLocaleString('zh-HK', {
@@ -302,57 +306,62 @@ async function setWeatherMode() {
             hour: '2-digit', minute: '2-digit', hour12: false
         });
 
-        // Clear Canvas
+        // 清空畫布
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.fillStyle = 'black';
         
-        // Title
-        ctx.font = `bold ${Math.floor(canvasEl.width / 14)}px sans-serif`;
-        ctx.fillText("香港天氣預報 (3 Days)", 10, 40);
+        // 標題
+        ctx.font = `bold ${Math.floor(canvasEl.width / 16)}px Arial`;
+        ctx.fillText("香港天氣 (PSR=雨率)", 10, 40);
         ctx.fillRect(10, 50, canvasEl.width - 20, 2);
 
         const startY = 90;
         const rowHeight = 65;
 
-        // Loop for 3 days
+        // 迴圈 3 天
         for (let i = 0; i < 3; i++) {
             const dayData = data.weatherForecast[startIndex + i];
             if (!dayData) break;
 
-            // Date Parsing
+            // 日期
             const y = dayData.forecastDate.substring(0,4);
             const m = dayData.forecastDate.substring(4,6);
             const d = dayData.forecastDate.substring(6,8);
             const dateObj = new Date(`${y}-${m}-${d}`);
             const dateText = `${parseInt(m)}/${parseInt(d)} (${weekDays[dateObj.getDay()]})`;
 
-            // Temperature
+            // 溫度
             const tempStr = `${dayData.forecastMintemp.value}-${dayData.forecastMaxtemp.value}°C`;
 
-            // --- Get Icon from Code ---
-            const iconEmoji = getWeatherEmoji(dayData.ForecastIcon);
-            // We can also append the specific text description provided by API if you want
-            // const weatherDesc = dayData.forecastWeather; // This is usually long text
+            // Emoji
+            const emoji = getWeatherEmoji(dayData.ForecastIcon);
+
+            // PSR 數值 (從 API 取得 PSR 欄位)
+            const psrVal = getShortPSR(dayData.PSR);
             
             const currentY = startY + (i * rowHeight);
 
-            // 1. Draw Date (Left)
-            ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px sans-serif`;
+            // 1. 日期 (左)
+            ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
             ctx.fillText(dateText, 10, currentY);
 
-            // 2. Draw Icon (Middle-Left) - Larger Font for Emoji
-            ctx.font = `${Math.floor(canvasEl.width / 14)}px sans-serif`; 
-            ctx.fillText(iconEmoji, 150, currentY); 
+            // 2. Emoji (中間偏左)
+            ctx.font = `${Math.floor(canvasEl.width / 14)}px Arial`; 
+            ctx.fillText(emoji, 150, currentY); 
 
-            // 3. Draw Temperature (Right)
+            // 3. PSR 數值 (中間偏右) - 加上外框或標籤感
+            ctx.font = `bold ${Math.floor(canvasEl.width / 20)}px Arial`;
+            ctx.fillText(`PSR:${psrVal}`, 200, currentY);
+
+            // 4. 溫度 (右)
             ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
             const tempWidth = ctx.measureText(tempStr).width;
             ctx.fillText(tempStr, canvasEl.width - tempWidth - 10, currentY);
         }
 
-        // Footer
-        ctx.font = `${Math.floor(canvasEl.width / 28)}px sans-serif`;
+        // 底部
+        ctx.font = `${Math.floor(canvasEl.width / 28)}px Arial`;
         ctx.fillText(`Updated: ${updateTime}`, 10, canvasEl.height - 10);
 
         if (typeof render === 'function') render();
