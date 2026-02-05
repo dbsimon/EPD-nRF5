@@ -245,14 +245,23 @@ const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php
 // 1. Emoji 對照表
 function getWeatherEmoji(code) {
     const c = parseInt(code);
-    if (c === 50) return "☀️"; 
-    if (c >= 51 && c <= 53) return "🌤️";
-    if (c === 54) return "🌦️";
-    if (c >= 60 && c <= 61) return "☁️";
-    if (c >= 62 && c <= 65) return "🌧️";
-    if (c >= 70 && c <= 77) "🌝";
-    if (c >= 80 && c <= 85) return "🌫️";
-    if (c >= 90 && c <= 93) return "❄";
+    if (c === 50) return "晴"; 
+    if (c >= 51 && c <= 53) return "短暫陽光";
+    if (c === 54) return "驟雨";
+    if (c >= 60 && c <= 61) return "雲";
+    if (c >= 62 && c <= 63) return "雨";
+	if (c >= 64 && c <= 65) return "大雨";
+    if (c >= 70 && c <= 77) "月";
+    if (c === 80) return "大風"; 
+	if (c === 81) return "乾燥"; 
+	if (c === 82) return "潮濕"; 
+	if (c === 83) return "霧"; 
+	if (c === 84) return "薄霧"; 
+	if (c === 85) return "煙霞"; 
+	if (c === 90) return "熱"; 
+	if (c === 91) return "暖"; 
+	if (c === 92) return "涼"; 
+	if (c === 93) return "冷"; 
     return "❓";
 }
 
@@ -331,7 +340,7 @@ async function setWeatherMode() {
             const currentY = startY + (i * rowHeight);
 
             // 1. 日期 (最左)
-            ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
+            ctx.font = `bold ${Math.floor(canvasEl.width / 14)}px Arial`;
             ctx.fillText(dateText, 10, currentY);
             
             // 獲取日期文字寬度，以便緊接著畫 Emoji
