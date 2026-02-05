@@ -238,57 +238,63 @@
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
 	<script type="text/javascript" src="js/main.js?v=20251109"></script>
 	
-<!-- 香港天氣功能 (絕對日期校正版) -->
+<!-- Hong Kong Weather Mode (Icon-based) -->
 <script>
 const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
 
-function getWeatherStatus(code) {
+// --- HKO Icon Code to Emoji Mapping ---
+// Source: https://www.hko.gov.hk/textonly/v2/explain/wxicon_e.htm
+function getWeatherEmoji(code) {
     const c = parseInt(code);
-    if (c === 50) return { t: "天晴", e: "☀️" };
-    if (c >= 51 && c <= 53) return { t: "晴/間中光", e: "🌤️" };
-    if (c === 54) return { t: "驟雨", e: "🌦️" };
-    if (c >= 60 && c <= 61) return { t: "多雲", e: "☁️" };
-    if (c >= 62 && c <= 65) return { t: "雨/雷暴", e: "🌧️" };
-    if (c >= 70 && c <= 77) return { t: "天色良好", e: "☀️" };
-    if (c >= 80 && c <= 85) return { t: "大風/霧", e: "🌫️" };
-    if (c >= 90 && c <= 93) return { t: "雨/熱帶", e: "⛈️" };
-    return { t: "", e: "" };
+    
+    // Sunny / Clear
+    if (c === 50) return "☀️"; // Sunny
+    if (c === 51) return "🌤️"; // Sunny periods
+    if (c === 52) return "🌤️"; // Sunny intervals
+    if (c === 53) return "🌤️"; // Sunny intervals with shower
+
+    // Cloudy / Overcast
+    if (c >= 60 && c <= 61) return "☁️"; // Cloudy
+    if (c === 62) return "🌥️"; // Light rain with clouds
+    if (c === 63) return "🌧️"; // Rain
+    if (c === 64) return "🌧️"; // Heavy rain
+    if (c === 65) return "⛈️"; // Thunderstorm
+
+    // Windy / Misty
+    if (c >= 80 && c <= 82) return "🌬️"; // Windy
+    if (c >= 83 && c <= 85) return "🌫️"; // Fog/Mist
+
+    // Extreme
+    if (c >= 90 && c <= 93) return "⛈️"; // Thunderstorm/Typhoon
+
+    return "❓"; // Unknown code
 }
 
 async function setWeatherMode() {
     const canvasEl = document.querySelector('canvas');
-    if (!canvasEl) { alert('找不到畫布元素'); return; }
+    if (!canvasEl) { alert('Canvas element not found'); return; }
     const ctx = canvasEl.getContext('2d');
     
-    // 1. 顯示讀取中
+    // Show Loading
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.fillStyle = 'black';
     ctx.font = '30px sans-serif';
-    ctx.fillText("校正日期並讀取中...", 10, 50);
+    ctx.fillText("Loading Weather...", 10, 50);
     if (typeof render === 'function') render();
 
     try {
         const response = await fetch(HKO_API_URL);
         const data = await response.json();
         
-        // --- 核心修正邏輯 ---
+        // --- Date Correction Logic ---
         const now = new Date();
-        // 格式化今天的日期為 YYYYMMDD (例如 20260205)
         const todayStr = now.getFullYear() + 
                         (now.getMonth()+1).toString().padStart(2, '0') + 
                         now.getDate().toString().padStart(2, '0');
         
-        // 在 API 返回的列表中尋找"今天"
-        // findIndex 會回傳 -1 如果找不到
         let startIndex = data.weatherForecast.findIndex(item => item.forecastDate === todayStr);
-        
-        // 如果找不到今天 (例如晚上 API 移除了今天)，就從第 0 筆開始 (即明天)
-        // 並設定一個變數來調整顯示文字 (可選)
-        if (startIndex === -1) {
-            startIndex = 0;
-            // 這種情況下，API 的第 0 筆就是明天 (例如 2/6)
-        }
+        if (startIndex === -1) startIndex = 0; // Default to tomorrow if today is gone
 
         const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
         const updateTime = now.toLocaleString('zh-HK', {
@@ -296,64 +302,69 @@ async function setWeatherMode() {
             hour: '2-digit', minute: '2-digit', hour12: false
         });
 
-        // 清空畫布
+        // Clear Canvas
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.fillStyle = 'black';
         
-        // 標題
+        // Title
         ctx.font = `bold ${Math.floor(canvasEl.width / 14)}px sans-serif`;
-        ctx.fillText("香港天氣預報 (未來3天)", 10, 40);
+        ctx.fillText("香港天氣預報 (3 Days)", 10, 40);
         ctx.fillRect(10, 50, canvasEl.width - 20, 2);
 
         const startY = 90;
         const rowHeight = 65;
 
-        // 迴圈 3 次，從正確的 startIndex 開始抓資料
+        // Loop for 3 days
         for (let i = 0; i < 3; i++) {
-            // 抓取資料：從 startIndex + i 開始
             const dayData = data.weatherForecast[startIndex + i];
-            
-            // 防止陣列越界 (雖然不太可能)
             if (!dayData) break;
 
-            // 解析日期
+            // Date Parsing
             const y = dayData.forecastDate.substring(0,4);
             const m = dayData.forecastDate.substring(4,6);
             const d = dayData.forecastDate.substring(6,8);
             const dateObj = new Date(`${y}-${m}-${d}`);
             const dateText = `${parseInt(m)}/${parseInt(d)} (${weekDays[dateObj.getDay()]})`;
 
+            // Temperature
             const tempStr = `${dayData.forecastMintemp.value}-${dayData.forecastMaxtemp.value}°C`;
-            const status = getWeatherStatus(dayData.ForecastIcon);
+
+            // --- Get Icon from Code ---
+            const iconEmoji = getWeatherEmoji(dayData.ForecastIcon);
+            // We can also append the specific text description provided by API if you want
+            // const weatherDesc = dayData.forecastWeather; // This is usually long text
+            
             const currentY = startY + (i * rowHeight);
 
-            // 繪製日期
+            // 1. Draw Date (Left)
             ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px sans-serif`;
             ctx.fillText(dateText, 10, currentY);
 
-            // 繪製天氣 (靠右一點)
-            ctx.font = `${Math.floor(canvasEl.width / 20)}px sans-serif`;
-            ctx.fillText(`${status.e} ${status.t}`, 160, currentY); 
+            // 2. Draw Icon (Middle-Left) - Larger Font for Emoji
+            ctx.font = `${Math.floor(canvasEl.width / 14)}px sans-serif`; 
+            ctx.fillText(iconEmoji, 150, currentY); 
 
-            // 繪製溫度 (靠最右)
+            // 3. Draw Temperature (Right)
             ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
             const tempWidth = ctx.measureText(tempStr).width;
             ctx.fillText(tempStr, canvasEl.width - tempWidth - 10, currentY);
         }
 
+        // Footer
         ctx.font = `${Math.floor(canvasEl.width / 28)}px sans-serif`;
-        ctx.fillText(`更新: ${updateTime}`, 10, canvasEl.height - 10);
+        ctx.fillText(`Updated: ${updateTime}`, 10, canvasEl.height - 10);
 
         if (typeof render === 'function') render();
         else if (typeof update === 'function') update();
 
     } catch (e) {
         console.error(e);
-        ctx.fillText("獲取失敗", 10, 50);
+        ctx.fillText("Load Failed", 10, 50);
     }
 }
 </script>
+
 
 
 	
