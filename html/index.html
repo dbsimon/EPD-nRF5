@@ -238,16 +238,30 @@
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
 	<script type="text/javascript" src="js/main.js?v=20251109"></script>
 	
-<!-- 香港天氣功能 (含日期時間更新) -->
+<!-- 香港天氣功能 (三天 + 天氣狀況版) -->
 <script>
 const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
+
+// 天文台 Icon 代碼轉文字/Emoji 對照表
+function getWeatherStatus(code) {
+    const c = parseInt(code);
+    if (c === 50) return { t: "天晴", e: "☀️" };
+    if (c >= 51 && c <= 53) return { t: "晴/間中有光", e: "🌤️" }; // 簡化顯示
+    if (c === 54) return { t: "驟雨", e: "🌦️" };
+    if (c >= 60 && c <= 61) return { t: "多雲", e: "☁️" };
+    if (c >= 62 && c <= 65) return { t: "雨/雷暴", e: "🌧️" };
+    if (c >= 70 && c <= 77) return { t: "天色良好", e: "☀️" };
+    if (c >= 80 && c <= 85) return { t: "大風/霧", e: "🌫️" };
+    if (c >= 90 && c <= 93) return { t: "雨/熱帶氣旋", e: "⛈️" };
+    return { t: "", e: "" }; // 未知
+}
 
 async function setWeatherMode() {
     const canvasEl = document.querySelector('canvas');
     if (!canvasEl) { alert('找不到畫布元素'); return; }
     const ctx = canvasEl.getContext('2d');
     
-    // 顯示載入中
+    // 載入畫面
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.fillStyle = 'black';
@@ -262,74 +276,84 @@ async function setWeatherMode() {
         const response = await fetch(HKO_API_URL);
         const data = await response.json();
         
+        // 準備時間與日期
         const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
         const now = new Date();
-        const todayIndex = now.getDay(); 
-        const tomorrowIndex = (todayIndex + 1) % 7;
+        const todayDateStr = now.toISOString().slice(0,10).replace(/-/g, ""); // YYYYMMDD
         
-        const apiDateStr = data.weatherForecast[0].forecastDate; 
-        const todayDateStr = now.toISOString().slice(0,10).replace(/-/g, "");
-        
-        let todayData, tomorrowData;
-        let todayLabel, tomorrowLabel;
-
-        if (apiDateStr === todayDateStr) {
-            todayData = data.weatherForecast[0];
-            tomorrowData = data.weatherForecast[1];
-            todayLabel = `今天 (${weekDays[todayIndex]})`;
-            tomorrowLabel = `明天 (${weekDays[tomorrowIndex]})`;
-        } else {
-            todayData = data.weatherForecast[0];
-            tomorrowData = data.weatherForecast[1];
-            const d1 = new Date(todayData.forecastDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-            const d2 = new Date(tomorrowData.forecastDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-            todayLabel = `${todayData.forecastDate.slice(4,6)}/${todayData.forecastDate.slice(6,8)} (${weekDays[d1.getDay()]})`;
-            tomorrowLabel = `${tomorrowData.forecastDate.slice(4,6)}/${tomorrowData.forecastDate.slice(6,8)} (${weekDays[d2.getDay()]})`;
-        }
-
-        const todayTemp = `${todayData.forecastMintemp.value}°C - ${todayData.forecastMaxtemp.value}°C`;
-        const tomorrowTemp = `${tomorrowData.forecastMintemp.value}°C - ${tomorrowData.forecastMaxtemp.value}°C`;
-        
-        // --- 這裡修改了時間格式 ---
+        // 更新時間 (含日期)
         const updateTime = now.toLocaleString('zh-HK', {
-            month: '2-digit', 
-            day: '2-digit', 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false // 24小時制
-        }); 
-        // 輸出結果範例: "02/05 12:05"
+            month: '2-digit', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit',
+            hour12: false
+        });
 
         // 清空畫布
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.fillStyle = 'black';
         
-        // 繪製
-        const x = 20;
-        let y = 50;
-        const lineHeight = canvasEl.height / 6;
+        // --- 1. 繪製標題 ---
+        ctx.font = `bold ${Math.floor(canvasEl.width / 14)}px sans-serif`;
+        ctx.fillText("香港未來三天天氣", 10, 40);
+        
+        // 畫一條橫線分隔標題
+        ctx.fillRect(10, 50, canvasEl.width - 20, 2);
 
-        ctx.font = `bold ${Math.floor(canvasEl.width / 12)}px sans-serif`;
-        ctx.fillText("香港天氣預報", x, y);
-        
-        y += lineHeight;
-        ctx.font = `${Math.floor(canvasEl.width / 18)}px sans-serif`;
-        ctx.fillText(`${todayLabel}:`, x, y);
-        
-        y += lineHeight;
-        ctx.font = `bold ${Math.floor(canvasEl.width / 8)}px Arial`;
-        ctx.fillText(todayTemp, x, y);
-        
-        y += lineHeight * 1.5;
-        ctx.font = `${Math.floor(canvasEl.width / 18)}px sans-serif`;
-        ctx.fillText(`${tomorrowLabel}: ${tomorrowTemp}`, x, y);
-        
-        y += lineHeight * 0.8;
-        ctx.font = `${Math.floor(canvasEl.width / 25)}px sans-serif`;
-        // 更新顯示文字
-        ctx.fillText(`更新: ${updateTime}`, x, y);
+        // --- 2. 迴圈繪製 3 天天氣 ---
+        // 根據 API 日期對齊，確保第一筆是對的
+        let startIndex = 0;
+        if (data.weatherForecast[0].forecastDate !== todayDateStr) {
+             // 如果 API 第一筆不是今天，依然顯示它，但我們知道那是"未來"的開始
+             // 這裡為了簡單，直接取前 3 筆，因為 FND API 總是給未來 9 天
+        }
 
+        const startY = 90; // 第一行起始高度
+        const rowHeight = 65; // 每行高度間距
+
+        for (let i = 0; i < 3; i++) {
+            const dayData = data.weatherForecast[i]; // 0=今, 1=明, 2=後
+            if (!dayData) break;
+
+            // 計算日期與星期
+            const y = dayData.forecastDate.substring(0,4);
+            const m = dayData.forecastDate.substring(4,6);
+            const d = dayData.forecastDate.substring(6,8);
+            const dateObj = new Date(`${y}-${m}-${d}`);
+            const dateStr = `${m}/${d} (${weekDays[dateObj.getDay()]})`;
+
+            // 取得溫度
+            const tempStr = `${dayData.forecastMintemp.value}-${dayData.forecastMaxtemp.value}°C`;
+
+            // 取得天氣狀況 (Icon -> 文字 + Emoji)
+            const status = getWeatherStatus(dayData.ForecastIcon);
+            
+            // 設定繪圖位置 (Y軸)
+            const currentY = startY + (i * rowHeight);
+
+            // 繪製: 日期
+            ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px sans-serif`;
+            ctx.fillText(dateStr, 10, currentY);
+
+            // 繪製: 天氣 Emoji + 文字 (靠右一點)
+            // 如果是墨水屏，Emoji 會變成黑白，建議搭配文字
+            ctx.font = `${Math.floor(canvasEl.width / 20)}px sans-serif`;
+            const weatherText = `${status.e} ${status.t}`; 
+            ctx.fillText(weatherText, 160, currentY); 
+
+            // 繪製: 溫度 (換行或靠右，視寬度而定，這裡放同一行最右邊或下一小行)
+            // 為了排版整齊，我們把溫度放在下一行稍微縮進，或者同一行最右邊
+            // 這裡採用: 同一行靠右對齊
+            ctx.font = `bold ${Math.floor(canvasEl.width / 18)}px Arial`;
+            const tempWidth = ctx.measureText(tempStr).width;
+            ctx.fillText(tempStr, canvasEl.width - tempWidth - 10, currentY);
+        }
+
+        // --- 3. 底部更新時間 ---
+        ctx.font = `${Math.floor(canvasEl.width / 28)}px sans-serif`;
+        ctx.fillText(`更新: ${updateTime}`, 10, canvasEl.height - 10);
+
+        // 渲染
         if (typeof render === 'function') render();
         else if (typeof update === 'function') update();
 
@@ -339,7 +363,7 @@ async function setWeatherMode() {
     }
 }
 </script>
-</script>
+
 	
 </body>
 
