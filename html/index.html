@@ -10,6 +10,16 @@
 </head>
 
 <body>
+	
+	<!-- 一鍵更新專用 UI (預設隱藏) -->
+<div id="quick-action-container" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f2f2f7; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; font-family: -apple-system, sans-serif;">
+    <h2 id="quick-action-title" style="margin-bottom: 30px; color: #333;">準備更新...</h2>
+    <button id="quick-action-btn" style="padding: 25px 40px; font-size: 24px; font-weight: bold; background-color: #007AFF; color: white; border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); cursor: pointer;">
+        點擊更新
+    </button>
+    <p id="quick-action-status" style="margin-top: 20px; color: #666;"></p>
+</div>
+	
 	<div class="main">
 		<h3>E-INK DISPLAY</h3>
 		<fieldset>
@@ -240,6 +250,96 @@
 	
 <!-- 香港天氣功能 (Emoji + PSR數值版) -->
 <script>
+const urlParams = new URLSearchParams(window.location.search);
+const autoMode = urlParams.get('hkwx'); // 例如 "hkwx" (香港天氣)
+const autoConnect = urlParams.get('auto') === '1';
+
+// 從網址讀取你想連線的設備名稱 (例如 &dev=EPD-Screen1)
+const targetDeviceName = urlParams.get('dev') || '預設設備名稱'; 
+
+window.addEventListener('load', () => {
+    // 如果 URL 有帶模式參數，自動把原版 UI 的 mode 選單切到該模式
+    if (autoMode) {
+        let modeSelect = document.getElementById('模式選單的ID'); // 記得改為原專案的 select ID
+        if(modeSelect) {
+            modeSelect.value = autoMode; 
+            modeSelect.dispatchEvent(new Event('change')); 
+        }
+    }
+
+    // 如果是由 Shortcut 觸發 (auto=1)
+    if (autoConnect) {
+        const container = document.getElementById('quick-action-container');
+        const btn = document.getElementById('quick-action-btn');
+        const title = document.getElementById('quick-action-title');
+        const status = document.getElementById('quick-action-status');
+        
+        // 顯示大按鈕畫面，蓋住原本複雜的網頁 UI
+        container.style.display = 'flex';
+        title.innerText = `模式: ${autoMode === 'hkwx' ? '香港天氣' : autoMode}`;
+        btn.innerText = `更新 ${targetDeviceName}`;
+
+        // 當按下大按鈕時
+        btn.addEventListener('click', async () => {
+            btn.style.backgroundColor = '#ccc';
+            btn.innerText = "處理中...";
+            status.innerText = "尋找設備中...";
+            
+            try {
+                let targetDevice = null;
+
+                // 1. 嘗試從「以前授權過」的清單中，找出名字相符的設備
+                if (navigator.bluetooth.getDevices) {
+                    const devices = await navigator.bluetooth.getDevices();
+                    targetDevice = devices.find(d => d.name === targetDeviceName);
+                }
+
+                // 2. 如果之前沒授權過，或者找不到，就叫出掃描視窗 (幫你過濾好名字)
+                if (!targetDevice) {
+                    status.innerText = "請在彈出視窗中選擇設備";
+                    targetDevice = await navigator.bluetooth.requestDevice({
+                        filters: [{ name: targetDeviceName }],
+                        // 注意：這裡必須加入原專案的 service UUID。
+                        // 找一下原版程式裡的 requestDevice 寫了什麼 optionalServices
+                        // optionalServices: ['0000xxxx-0000-1000-8000-00805f9b34fb'] 
+                    });
+                }
+
+                if (targetDevice) {
+                    status.innerText = "已找到設備，連線中...";
+                    
+                    // ==========================================
+                    // 【對接原版程式碼】
+                    // 這裡要把 targetDevice 傳給原版的連線函數。
+                    // 原版程式通常有一個全域變數，例如 `bluetoothDevice = targetDevice;`
+                    // 然後呼叫連線與傳圖的 function。例如：
+                    // 
+                    // bluetoothDevice = targetDevice;
+                    // await connect(); 
+                    // sendImage();
+                    // ==========================================
+
+                    btn.style.backgroundColor = '#34C759'; // 變成綠色
+                    btn.innerText = "發送完成";
+                    status.innerText = "可以關閉此頁面了";
+                }
+            } catch (error) {
+                console.error(error);
+                btn.style.backgroundColor = '#FF3B30'; // 變成紅色
+                btn.innerText = "發生錯誤";
+                status.innerText = "請確認藍牙是否開啟，或重新整理頁面。";
+            }
+        });
+    }
+});
+
+
+//----
+
+
+
+
+	
 const HKO_API_URL = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
 
 // 1. Emoji 對照表
